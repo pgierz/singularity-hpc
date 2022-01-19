@@ -119,13 +119,7 @@ class ContainerConfig:
         Set a tag to be the config default (defaults to latest otherwise)
         """
         # If a tag isn't provided, default to latest
-        if not tag:
-            self.tag = self.tags.latest
-
-        # This way, if the user explicitly asks for a tag that does not exist
-        # this value will be none (and we can raise an error)
-        else:
-            self.tag = self.tags.get(tag)
+        self.tag = self.tags.latest if not tag else self.tags.get(tag)
 
     def dump(self, out=None):
         out = out or sys.stdout

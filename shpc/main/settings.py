@@ -208,11 +208,7 @@ class SettingsBase:
         """
         Given a value, make substitutions
         """
-        if isinstance(value, bool) or not value:
-            return value
-
-        # Currently dicts only support boolean or null so we return as is
-        elif isinstance(value, dict):
+        if isinstance(value, bool) or not value or isinstance(value, dict):
             return value
 
         for rep, repvalue in defaults.reps.items():
@@ -240,8 +236,7 @@ class SettingsBase:
             yaml.dump(self._settings, fd)
 
     def __iter__(self):
-        for key, value in self.__dict__.items():
-            yield key, value
+        yield from self.__dict__.items()
 
 
 class Settings(SettingsBase):
