@@ -1,0 +1,12 @@
+docker: pgierz/datascience-viz-notebook
+url: https://hub.docker.com/r/pgierz/datascience-viz-notebook
+maintainer: '@pgierz'
+description: Jupyter Datascience Notebook from https://github.com/jupyter/docker-stacks, including HoloViz Libraries
+latest:
+  "1.0": sha256:357ece39e11b47d0f324dc5984018ae2cde1d4676fdf626da1741817aafb3fff
+tags:
+  "1.0": sha256:357ece39e11b47d0f324dc5984018ae2cde1d4676fdf626da1741817aafb3fff 
+  latest: sha256:357ece39e11b47d0f324dc5984018ae2cde1d4676fdf626da1741817aafb3fff 
+aliases:
+- name: run-notebook
+  command: jupyter notebook --no-browser --port=$(shuf -i 2000-65000 -n 1) --ip 0.0.0.0

@@ -1,0 +1,19 @@
+docker: pgierz/esm-plots-notebook
+url: https://hub.docker.com/r/pgierz/esm-plots-notebook
+maintainer: '@pgierz'
+description: Jupyter Datascience Notebook from https://github.com/jupyter/docker-stacks, including HoloViz Libraries
+latest:
+  "1.1": sha256:90c0895ff174557e5f233f167ea232bd3da8b786f8a6a114f5d73a1a5369cba1
+tags:
+  "latest": sha256:90c0895ff174557e5f233f167ea232bd3da8b786f8a6a114f5d73a1a5369cba1
+  "1.1": sha256:90c0895ff174557e5f233f167ea232bd3da8b786f8a6a114f5d73a1a5369cba1
+  "1.0":  sha256:eeb46dd88186647fbdedc6881c4a99cfe47ba77c7e242cd49040f4d590aab739
+aliases:
+- name: run-lab
+  command: jupyter lab --no-browser --port=$(shuf -i 2000-65000 -n 1) --ip 0.0.0.0
+- name: run-notebook
+  command: jupyter notebook --no-browser --port=$(shuf -i 2000-65000 -n 1) --ip 0.0.0.0
+- name: create-notebooks
+  command: papermill
+- name: interact-notebooks
+  command: panel_port=$(shuf -i 2000-65000 -n 1) && panel serve --address 0.0.0.0 --allow-websocket-origin=ollie0.awi.de:$panel_port --port $panel_port
