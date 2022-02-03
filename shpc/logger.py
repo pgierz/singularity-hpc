@@ -33,7 +33,7 @@ class ColorizingStreamHandler(_logging.StreamHandler):
     def can_color_tty(self):
         if "TERM" in os.environ and os.environ["TERM"] == "dumb":
             return False
-        return self.is_tty and not platform.system() == "Windows"
+        return self.is_tty and platform.system() != "Windows"
 
     @property
     def is_tty(self):

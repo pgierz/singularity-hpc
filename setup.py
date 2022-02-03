@@ -4,7 +4,7 @@ import os
 
 
 def get_lookup():
-    lookup = dict()
+    lookup = {}
     version_file = os.path.join("shpc", "version.py")
     with open(version_file) as filey:
         exec(filey.read(), lookup)
@@ -16,7 +16,7 @@ def get_reqs(lookup=None, key="INSTALL_REQUIRES"):
     """get requirements, mean reading in requirements and versions from
     the lookup obtained with get_lookup"""
 
-    if lookup == None:
+    if lookup is None:
         lookup = get_lookup()
 
     install_requires = []
@@ -26,7 +26,7 @@ def get_reqs(lookup=None, key="INSTALL_REQUIRES"):
         if "exact_version" in module_meta:
             dependency = "%s==%s" % (module_name, module_meta["exact_version"])
         elif "min_version" in module_meta:
-            if module_meta["min_version"] == None:
+            if module_meta["min_version"] is None:
                 dependency = module_name
             else:
                 dependency = "%s>=%s" % (module_name, module_meta["min_version"])

@@ -96,9 +96,7 @@ class ModuleBase(BaseClient):
 
         if container_dir != module_dir:
             self._uninstall(container_dir, "$container_base/%s" % name, force)
-            self._uninstall(module_dir, "$module_base/%s" % name, force)
-        else:
-            self._uninstall(module_dir, "$module_base/%s" % name, force)
+        self._uninstall(module_dir, "$module_base/%s" % name, force)
 
     def _uninstall(self, module_dir, name, force=False):
         """

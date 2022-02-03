@@ -48,7 +48,7 @@ class SingularityContainer(ContainerTechnology):
         container_dir = self.container_dir(module_name)
 
         # A container must be present
-        return True if glob("%s%s*.sif" % (container_dir, os.sep)) else False
+        return bool(glob("%s%s*.sif" % (container_dir, os.sep)))
 
     def get(self, module_name, env_file=False):
         """
@@ -310,7 +310,7 @@ class SingularityContainer(ContainerTechnology):
         uri = uri.replace("gh://", "", 1)
 
         # repository name and image prefix
-        repo = "/".join(uri.split("/")[0:2])
+        repo = "/".join(uri.split("/")[:2])
         prefix = repo.replace("/", "-")
 
         # The tag includes release and contianer tag (e.g., 0.0.1:latest)

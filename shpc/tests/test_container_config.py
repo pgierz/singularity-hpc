@@ -34,7 +34,7 @@ def test_name_parsing(tmp_path):
     parsed = config.name
 
     assert not parsed.registry
-    assert not parsed.namespace == "vgteam"
+    assert parsed.namespace != "vgteam"
     assert parsed.tool == "python"
     assert not parsed.tag
     assert not parsed.digest
