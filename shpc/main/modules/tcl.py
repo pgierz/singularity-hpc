@@ -1,8 +1,8 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
-from shpc.main.modules import ModuleBase
+from .base import ModuleBase
 
 
 class Client(ModuleBase):
@@ -10,5 +10,8 @@ class Client(ModuleBase):
         """
         An Lmod client generates an lmod recipe for install
         """
-        super(Client, self).__init__(**kwargs)
+        # The extension is technically not required, but we still set one for clarity
         self.module_extension = "tcl"
+        # Except for symlink, since the goal is to have short names
+        self.symlink_extension = ""
+        super(Client, self).__init__(**kwargs)

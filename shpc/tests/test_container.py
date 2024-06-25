@@ -1,23 +1,27 @@
 #!/usr/bin/python
 
-# Copyright (C) 2021-2022 Vanessa Sochat.
+# Copyright (C) 2021-2024 Vanessa Sochat.
 
 # This Source Code Form is subject to the terms of the
 # Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
 # with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import pytest
-import shutil
 import os
+
+import pytest
 
 import shpc.main.container as container
 
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.dirname(here)
 
+ci = os.environ.get("GITHUB_CI")
+
 
 def test_pull_gh(tmp_path):
-    """Test a singularity container command"""
+    """
+    Test a singularity container command
+    """
     cli = container.SingularityContainer()
 
     # Test default Singularity pull
@@ -31,8 +35,19 @@ def test_pull_gh(tmp_path):
     assert os.path.exists(result)
 
 
+def test_pull_oras(tmp_path):
+    cli = container.SingularityContainer()
+
+    # Test default Singularity pull
+    image = os.path.join(str(tmp_path), "container.sif")
+    result = cli.pull("oras://ghcr.io/singularityhub/github-ci:latest", image)
+    assert os.path.exists(result)
+
+
 def test_podman(tmp_path):
-    """Test a singularity container command"""
+    """
+    Test a singularity container command
+    """
     cli = container.PodmanContainer()
 
     # Test default Singularity pull
@@ -42,8 +57,11 @@ def test_podman(tmp_path):
     assert not cli.exists(result)
 
 
+@pytest.mark.skipif(ci is not None, reason="GitHub actions docker socket not working")
 def test_docker(tmp_path):
-    """Test a singularity container command"""
+    """
+    Test a singularity container command
+    """
     cli = container.DockerContainer()
 
     # Test default Singularity pull

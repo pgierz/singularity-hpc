@@ -1,11 +1,9 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
 from .docker import DockerContainer
-
-import os
 
 
 class PodmanContainer(DockerContainer):
@@ -17,11 +15,9 @@ class PodmanContainer(DockerContainer):
     templatefile = "docker"
     command = "podman"
 
-    def shell(self, image):
+    @property
+    def shell_path(self):
         """
-        Interactive shell into a container image.
+        Return the path of the shell to use with this container.
         """
-        os.system(
-            "podman run -it --rm --entrypoint %s %s"
-            % (self.settings.podman_shell, image)
-        )
+        return self.settings.podman_shell

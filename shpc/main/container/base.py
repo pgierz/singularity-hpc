@@ -1,15 +1,16 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
-from shpc.logger import logger
-import shpc.main.templates
-import shpc.utils
-
-from jinja2 import Template
 import os
 import re
+
+from jinja2 import Template
+
+import shpc.main.templates
+import shpc.utils
+from shpc.logger import logger
 
 
 class ContainerName:
@@ -25,6 +26,9 @@ class ContainerName:
         self.version = None
         self.digest = None
         self.parse(raw)
+
+    def __str__(self):
+        return self.raw
 
     def parse(self, raw):
         """
@@ -50,7 +54,6 @@ class ContainerTechnology:
     features = {}
 
     def __init__(self):
-
         # If we weren't created with settings, add empty
         if not hasattr(self, "settings"):
             from shpc.main.settings import SettingsBase
@@ -63,13 +66,16 @@ class ContainerTechnology:
         """
         logger.warning("Add is not supported for %s" % self)
 
-    def add_environment(self, module_dir, envars, environment_file):
+    def add_environment(self, env_dir, envars, environment_file):
         """
         Given one or more environment variables in a dictionary, write to file.
+
+        The environment file goes in the wrapper directory, which can default
+        to the module directory if the value uses the default or is unset.
         """
         # Podman envars are written directly to the module file
         out = Template(shpc.main.templates.environment_file).render(envars=envars)
-        env_file = os.path.join(module_dir, environment_file)
+        env_file = os.path.join(env_dir, environment_file)
         shpc.utils.write_file(env_file, out)
 
     def delete(self, image):
@@ -77,6 +83,15 @@ class ContainerTechnology:
         If a container doesn't reside in the module directory, allow custom delete
         """
         pass
+
+    def module_dir(self, name):
+        """
+        Get the module directory the container references
+        """
+        # If the user provided a tag, tags are converted to folders
+        if ":" in name:
+            name = name.replace(":", os.sep)
+        return os.path.join(self.settings.module_base, name)
 
     def container_dir(self, name):
         """
@@ -90,13 +105,14 @@ class ContainerTechnology:
             return os.path.join(self.settings.module_base, name)
         return os.path.join(self.settings.container_base, name)
 
-    def iter_registry(self):
+    def clean_labels(self, labels):
         """
-        Iterate over known registries defined in settings.
+        Clean labels, meaning removing newlines and replacing with label separator
         """
-        for registry in self.settings.registry:
-            for filename in shpc.utils.recursive_find(registry):
-                yield registry, filename
+        updated_labels = {}
+        for key, value in labels.items():
+            updated_labels[key] = value.replace("\n", self.settings.label_separator)
+        return updated_labels
 
     def guess_tag(self, module_name, allow_fail=False):
         """
@@ -130,8 +146,8 @@ class ContainerTechnology:
         """
         module_name = self.guess_tag(module_name)
 
-        # This can be the module or container directory
-        container_dir = self.container_dir(module_name)
+        # The environment file is stored in the module directory
+        container_dir = self.module_dir(module_name)
 
         # Does the user want to see a module file?
         result = os.path.join(container_dir, self.settings.environment_file)
@@ -155,18 +171,14 @@ class ContainerTechnology:
 
         # The config features (defined by the container) determine what we add
         for key, value in config_features.items():
-
             # If the container technology has the feature and is defined in settings
             if key in self.features and key in settings_features:
-
                 # Case 1: the feature is known to the container technology
                 if settings_features[key] in self.features[key]:
-
                     features[key] = self.features[key][settings_features[key]]
 
                 # Case 2: the exact value isn't known, but the feature accepts a string
                 elif type(settings_features[key]) in self.features[key]:
-
                     # Add the feature to be given to the container!
                     value = self.features[key][type(settings_features[key])]
                     if value == "[use-self]":

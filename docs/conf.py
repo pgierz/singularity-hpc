@@ -13,9 +13,12 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
+
 from recommonmark.parser import CommonMarkParser
+
+from shpc import version
 
 source_parsers = {".md": CommonMarkParser}
 
@@ -59,9 +62,8 @@ master_doc = "index"
 
 # General information about the project.
 project = "Singularity Registry (HPC)"
-copyright = "2021, Vanessa Sochat"
+copyright = "2021-2023, Vanessa Sochat"
 
-from shpc import version
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -290,4 +292,4 @@ texinfo_documents = [
 
 
 def setup(app):
-    app.add_stylesheet("sphinx-argparse.css")
+    app.add_css_file("sphinx-argparse.css")

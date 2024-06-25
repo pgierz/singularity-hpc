@@ -1,10 +1,12 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
+
+import shpc.utils
 
 
 def main(args, parser, extra, subparser):
-
+    shpc.utils.ensure_no_extra(extra)
     lookup = {"ipython": ipython, "python": python, "bpython": bpython}
     shells = ["ipython", "python", "bpython"]
 
@@ -34,19 +36,23 @@ def main(args, parser, extra, subparser):
 def create_client(args):
     from shpc.main import get_client
 
-    return get_client(
+    cli = get_client(
         quiet=args.quiet,
         settings_file=args.settings_file,
-        module=args.module,
+        module_sys=args.module_sys,
         container_tech=args.container_tech,
     )
+
+    # Update config settings on the fly
+    cli.settings.update_params(args.config_params)
+    return cli
 
 
 def ipython(args):
     """
     Generate an IPython shell with the client.
     """
-    client = create_client(args)
+    client = create_client(args)  # noqa
     from IPython import embed
 
     embed()

@@ -1,14 +1,14 @@
 #!/usr/bin/python
 
-# Copyright (C) 2021-2022 Vanessa Sochat.
+# Copyright (C) 2021-2023 Vanessa Sochat.
 
 # This Source Code Form is subject to the terms of the
 # Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
 # with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import pytest
-import shutil
 import os
+
+import pytest
 
 from shpc.main.settings import Settings
 
@@ -32,7 +32,7 @@ def test_set_get(tmp_path):
     """Test variable set/get"""
     settings_file = os.path.join(root, "settings.yml")
     settings = Settings(settings_file)
-    assert not settings.container_base
+    assert settings.container_base.endswith("containers")
     settings.set("container_base", "/tmp/containers")
     settings.set("container_features", "gpu:amd")
     assert settings.container_base == "/tmp/containers"

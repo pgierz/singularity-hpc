@@ -1,8 +1,9 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 import os
+
 import shpc.utils as utils
 
 install_dir = utils.get_installdir()
@@ -17,7 +18,13 @@ user_settings_file = os.path.join(
 )
 
 # variables in settings that allow environment variable expansion
-allowed_envars = ["container_base", "module_base", "registry"]
+allowed_envars = [
+    "container_base",
+    "module_base",
+    "views_base",
+    "wrapper_base",
+    "registry",
+]
 
-# The GitHub repository with recipes
-github_url = "https://github.com/singularityhub/singularity-hpc"
+# The default GitHub registry with recipes (for docgen)
+github_url = "https://github.com/singularityhub/shpc-registry"

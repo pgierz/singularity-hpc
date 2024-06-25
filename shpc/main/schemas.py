@@ -1,16 +1,16 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
 ## ContainerConfig Schema
 
-schema_url = "https://json-schema.org/draft-07/schema/#"
+schema_url = "http://json-schema.org/draft-07/schema"
 
 # This is also for latest, and a list of tags
 
 # The simplest form of aliases is key/value pairs
-aliases = {
+keyvals = {
     "type": "object",
     "patternProperties": {
         "\\w[\\w-]*": {"type": "string"},
@@ -52,41 +52,53 @@ aliases_list = {
             "command": {"type": "string"},
             "singularity_options": {"type": "string"},
             "docker_options": {"type": "string"},
+            "singularity_script": {"type": "string"},
+            "docker_script": {"type": "string"},
         },
     },
 }
 
-
-latest = {
-    "type": "object",
-    "minProperties": 1,
-    "maxProperties": 1,
-    "patternProperties": {
-        "\\w[\\w-]*": {"type": "string"},
-    },
-}
-
 containerConfigProperties = {
-    "latest": aliases,
+    "latest": keyvals,
     "docker": {"type": "string"},
+    "path": {"type": "string"},
+    "oras": {"type": "string"},
     "gh": {"type": "string"},
     "url": {"type": "string"},
     "test": {"type": "string"},
     "maintainer": {"type": "string"},
     "description": {"type": "string"},
-    "tags": aliases,
+    "docker_scripts": keyvals,
+    "singularity_scripts": keyvals,
+    "tags": keyvals,
     "filter": {
         "type": "array",
         "items": {"type": "string"},
     },
-    "env": aliases,
+    "env": keyvals,
     "features": features,
+    "overrides": keyvals,
     "aliases": {
         "oneOf": [
-            aliases,
+            keyvals,
             aliases_list,
         ]
     },
+}
+
+
+# Shpc extra configuration
+# Currently supports sync-registry
+
+extraConfig = {
+    "$schema": schema_url,
+    "title": "Registry Extra Schema",
+    "type": "object",
+    "required": [
+        "sync_registry",
+    ],
+    "properties": {"sync_registry": keyvals},
+    "additionalProperties": False,
 }
 
 
@@ -104,6 +116,18 @@ containerConfig = {
     "additionalProperties": False,
 }
 
+# Wrapper scripts for global (aliases) and container.yaml
+wrapper_scripts = {
+    "type": "object",
+    "properties": {
+        "enabled": {"type": "boolean"},
+        "docker": {"type": ["string", "null"]},
+        "podman": {"type": ["string", "null"]},
+        "templates": {"type": ["string", "null"]},
+        "singularity": {"type": ["string", "null"]},
+    },
+}
+
 
 ## Settings.yml (loads as json)
 
@@ -112,6 +136,8 @@ shells = ["/bin/bash", "/bin/sh", "/bin/csh"]
 # Currently all of these are required
 settingsProperties = {
     "registry": {"type": "array", "items": {"type": "string"}},
+    "sync_registry": {"type": "string"},
+    "wrapper_base": {"type": ["string", "null"]},
     "module_base": {"type": "string"},
     "container_base": {"type": ["string", "null"]},
     "namespace": {"type": ["string", "null"]},
@@ -122,13 +148,26 @@ settingsProperties = {
     "module_name": {"type": "string"},
     "config_editor": {"type": "string"},
     "environment_file": {"type": "string"},
-    "default_version": {"type": "boolean"},
+    "default_version": {
+        "oneOf": [
+            {"type": ["null", "boolean"]},
+            {
+                "type": "string",
+                "enum": ["module_sys", "last_installed", "first_installed"],
+            },
+        ]
+    },
     "enable_tty": {"type": "boolean"},
+    "label_separator": {"type": "string"},
+    "views_base": {"type": ["string", "null"]},
+    "default_view": {"type": ["string", "null"]},
+    "wrapper_scripts": wrapper_scripts,
     "container_tech": {"type": "string", "enum": ["singularity", "podman", "docker"]},
     "singularity_shell": {"type": "string", "enum": shells},
     "podman_shell": {"type": "string", "enum": shells},
     "docker_shell": {"type": "string", "enum": shells},
     "test_shell": {"type": "string", "enum": shells},
+    "wrapper_shell": {"type": "string", "enum": shells},
     "module_sys": {"type": "string", "enum": ["lmod", "tcl", None]},
     "container_features": container_features,
 }
@@ -149,5 +188,32 @@ settings = {
         "container_features",
     ],
     "properties": settingsProperties,
+    "additionalProperties": False,
+}
+
+# Views
+
+viewProperties = {
+    "system_modules": {"type": "array", "items": {"type": "string"}},
+    "depends_on": {"type": "array", "items": {"type": "string"}},
+    "modules": {"type": "array", "items": {"type": "string"}},
+    "name": {"type": "string"},
+}
+
+
+views = {
+    "$schema": schema_url,
+    "title": "Views Schema",
+    "type": "object",
+    "required": [
+        "view",
+    ],
+    "properties": {
+        "view": {
+            "type": "object",
+            "properties": viewProperties,
+            "additionalProperties": False,
+        }
+    },
     "additionalProperties": False,
 }

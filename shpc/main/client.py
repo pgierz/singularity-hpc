@@ -1,17 +1,17 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
-from shpc.logger import logger
-import shpc.main.container as container
-import shpc.utils as utils
-from .settings import Settings
-
 import os
-import re
 import shutil
-import sys
+
+import shpc.main.container as container
+import shpc.main.registry as registry
+import shpc.utils as utils
+from shpc.logger import logger
+
+from .settings import Settings
 
 
 class Client:
@@ -33,7 +33,6 @@ class Client:
     # Setup
 
     def __init__(self, settings_file=None):
-
         # We don't necessarily need a container technology handle
         if not hasattr(self, "container"):
             self.container = None
@@ -42,11 +41,20 @@ class Client:
         if not hasattr(self, "settings"):
             self.settings = Settings(settings_file)
 
+        # Load registries from settings (into a single registry)
+        self.reload_registry()
+
     def __repr__(self):
         return str(self)
 
     def __str__(self):
         return "[shpc-client]"
+
+    def reload_registry(self):
+        """
+        Reload registry from settings.
+        """
+        self.registry = registry.Registry(self.settings)
 
     def install(self, name, tag=None, **kwargs):
         """
@@ -88,21 +96,19 @@ class Client:
 
     def load_registry_config(self, name):
         """
-        Given an identifier, find the first match in the registry.
+        Given an identifier, find the first match in a registry provider.
         """
-        for registry, fullpath in self.container.iter_registry():
-            package_dir = os.path.join(registry, name)
-            package_file = os.path.join(package_dir, "container.yaml")
-            if package_file == fullpath:
-                return container.ContainerConfig(package_file)
+        result = self.registry.find(name)
+        if not result:
+            logger.exit("%s is not a known recipe in any registry." % name)
+        return container.ContainerConfig(result)
 
-        logger.exit("%s is not a known recipe in any registry." % name)
-
-    def _load_container(self, name, tag=None):
+    def _load_container(self, name):
         """
         Given a name and an optional tag to default to, load a package
         """
         # Split name and tag
+        tag = None
         if ":" in name:
             name, tag = name.split(":", 1)
 
@@ -110,6 +116,20 @@ class Client:
         config = self.load_registry_config(name)
         config.set_tag(tag)
         return config
+
+    def update(self, name=None, dryrun=False, filters=None):
+        """
+        Given a module name (or None for all modules) upgrade the registry.
+        """
+        # No name provided == "update all"
+        if name:
+            modules = [name]
+        else:
+            modules = [x[1] for x in list(self.registry.iter_modules())]
+
+        for module_name in modules:
+            config = self._load_container(module_name)
+            config.update(dryrun=dryrun, filters=filters)
 
     def test(
         self,
@@ -136,6 +156,11 @@ class Client:
         # Derive the registry entry from the module_name
         config = self._load_container(module_name)
 
+        # Ensure any alias files exist
+        if config and not config.check_overrides():
+            cleanup(tmpdir)
+            logger.exit("Test of %s was not successful." % module_name)
+
         # Generate a test template
         test_file = os.path.join(tmpdir, "test.sh")
 
@@ -148,15 +173,15 @@ class Client:
 
         # Test all tags (this could be subsetted)
         for tag in tags:
-
-            image = self.install(module_name, tag)
+            versioned_name = module_name + ":" + tag
+            image = self.install(versioned_name)
 
             # Do we want to test loading?
             if not skip_module and hasattr(self, "_test"):
                 result = self._test(module_name, tmpdir, tag, template)
                 if result != 0:
                     cleanup(tmpdir)
-                    logger.exit("Test of %s was not successful." % module_name)
+                    logger.exit("Test of %s was not successful." % versioned_name)
 
             # Do we want to test the test commands?
             if test_commands and config.test:
@@ -164,7 +189,7 @@ class Client:
                 return_code = self.container.test_script(image, test_file)
                 if return_code != 0:
                     cleanup(tmpdir)
-                    logger.exit("Test of %s was not successful." % module_name)
+                    logger.exit("Test of %s was not successful." % versioned_name)
 
             # Test the commands
             if not test_exec:
@@ -196,13 +221,13 @@ class Client:
         """
         raise NotImplementedError
 
-    def docgen(self, module_name):
+    def docgen(self, module_name, registry=None):
         """
         Render documentation for a module.
         """
         raise NotImplementedError
 
-    def show(self, name, names_only=False, out=None, filter_string=None):
+    def show(self, name, names_only=False, out=None, filter_string=None, limit=None):
         """
         Show available packages
         """
@@ -211,22 +236,27 @@ class Client:
             config = self._load_container(name)
             config.dump(out)
         else:
-            out = out or sys.stdout
+            # Assemble the list of contents to write
+            modules = []
+            for i, entry in enumerate(
+                self.registry.iter_registry(filter_string=filter_string)
+            ):
+                # Break after the limit
+                if limit and i > limit:
+                    break
 
-            # List the known registry modules
-            for registry, fullpath in self.container.iter_registry():
-                if fullpath.endswith("container.yaml"):
-                    module_name = (
-                        os.path.dirname(fullpath).replace(registry, "").strip(os.sep)
-                    )
+                config = container.ContainerConfig(entry)
+                if names_only:
+                    if out is None:
+                        print(config.name)
+                    modules.append(config.name)
+                else:
+                    for version in config.tags.keys():
+                        module = "%s:%s" % (config.name, version)
+                        if out is None:
+                            print(module)
+                        modules.append(module)
 
-                    # If the user has provided a filter, honor it
-                    if filter_string and not re.search(filter_string, module_name):
-                        continue
-
-                    if names_only:
-                        out.write("%s\n" % module_name)
-                    else:
-                        config = self._load_container(module_name)
-                        for version in config.tags.keys():
-                            out.write("%s:%s\n" % (module_name, version))
+            # Write output to file or print to terminal
+            if out is not None:
+                utils.write_file(out, "\n".join(modules))

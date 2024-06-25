@@ -1,6 +1,6 @@
-from setuptools import setup, find_packages
-import codecs
 import os
+
+from setuptools import find_packages, setup
 
 
 def get_lookup():
@@ -16,7 +16,7 @@ def get_reqs(lookup=None, key="INSTALL_REQUIRES"):
     """get requirements, mean reading in requirements and versions from
     the lookup obtained with get_lookup"""
 
-    if lookup == None:
+    if lookup is None:
         lookup = get_lookup()
 
     install_requires = []
@@ -26,10 +26,15 @@ def get_reqs(lookup=None, key="INSTALL_REQUIRES"):
         if "exact_version" in module_meta:
             dependency = "%s==%s" % (module_name, module_meta["exact_version"])
         elif "min_version" in module_meta:
-            if module_meta["min_version"] == None:
+            if module_meta["min_version"] is None:
                 dependency = module_name
             else:
                 dependency = "%s>=%s" % (module_name, module_meta["min_version"])
+        elif "max_version" in module_meta:
+            if module_meta["max_version"] is None:
+                dependency = module_name
+            else:
+                dependency = "%s<=%s" % (module_name, module_meta["max_version"])
         install_requires.append(dependency)
     return install_requires
 
@@ -43,6 +48,7 @@ lookup = get_lookup()
 VERSION = lookup["__version__"]
 NAME = lookup["NAME"]
 AUTHOR = lookup["AUTHOR"]
+EMAIL = lookup["EMAIL"]
 PACKAGE_URL = lookup["PACKAGE_URL"]
 KEYWORDS = lookup["KEYWORDS"]
 DESCRIPTION = lookup["DESCRIPTION"]
@@ -52,7 +58,7 @@ LICENSE = lookup["LICENSE"]
 try:
     with open("README.md") as filey:
         LONG_DESCRIPTION = filey.read()
-except:
+except Exception:
     LONG_DESCRIPTION = DESCRIPTION
 
 ################################################################################
@@ -60,7 +66,6 @@ except:
 ################################################################################
 
 if __name__ == "__main__":
-
     INSTALL_REQUIRES = get_reqs(lookup)
     TESTS_REQUIRES = get_reqs(lookup, "TESTS_REQUIRES")
     INSTALL_REQUIRES_ALL = get_reqs(lookup, "INSTALL_REQUIRES_ALL")
@@ -69,6 +74,7 @@ if __name__ == "__main__":
         name=NAME,
         version=VERSION,
         author=AUTHOR,
+        author_email=EMAIL,
         maintainer=AUTHOR,
         packages=find_packages(),
         include_package_data=True,
@@ -94,7 +100,7 @@ if __name__ == "__main__":
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering",
             "Operating System :: Unix",
-            "Programming Language :: Python :: 3.3",
+            "Programming Language :: Python :: 3.7",
         ],
         entry_points={"console_scripts": ["shpc=shpc.client:run_shpc"]},
     )

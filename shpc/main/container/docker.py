@@ -1,17 +1,19 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
-from shpc.logger import logger
-from .base import ContainerTechnology
-import shpc.main.templates
-import shpc.utils
-
-from datetime import datetime
 import json
 import os
 import sys
+from datetime import datetime
+
+import shpc.main.templates
+import shpc.main.wrappers
+import shpc.utils
+from shpc.logger import logger
+
+from .base import ContainerTechnology
 
 
 class DockerContainer(ContainerTechnology):
@@ -32,13 +34,20 @@ class DockerContainer(ContainerTechnology):
             )
         super(DockerContainer, self).__init__()
 
+    @property
+    def shell_path(self):
+        """
+        Return the path of the shell to use with this container.
+        """
+        return self.settings.docker_shell
+
     def shell(self, image):
         """
         Interactive shell into a container image.
         """
         os.system(
-            "docker run -it --rm --entrypoint %s %s"
-            % (self.settings.docker_shell, image)
+            "%s run -it --rm --entrypoint %s %s"
+            % (self.command, self.shell_path, image)
         )
 
     def add_registry(self, uri):
@@ -56,7 +65,7 @@ class DockerContainer(ContainerTechnology):
         """
         Pull a container to the library.
         """
-        pull_type = "docker" if getattr(config, "docker") else "gh"
+        pull_type = config.get_pull_type()
         if pull_type != "docker":
             logger.exit("%s only supports Docker (oci registry) pulls." % self.command)
 
@@ -176,20 +185,7 @@ class DockerContainer(ContainerTechnology):
         # Return code
         return result["return_code"]
 
-    def install(
-        self,
-        module_path,
-        container_path,
-        name,
-        template,
-        parsed_name,
-        aliases=None,
-        url=None,
-        description=None,
-        version=None,
-        config_features=None,
-        features=None,
-    ):
+    def install(self, module_path, template, module, features=None):
         """Install a general container path to a module
 
         The module_dir should be created by the calling function, and
@@ -200,43 +196,46 @@ class DockerContainer(ContainerTechnology):
         # Container features are defined in container.yaml and the settings
         # and specific values are determined by the container technology
         features = self.get_features(
-            config_features, self.settings.container_features, features
+            module.config.features, self.settings.container_features, features
         )
 
         # Ensure that the container exists
         # Do we want to clean up other versions here too?
-        manifest = self.inspect(container_path)
+        manifest = self.inspect(module.container_path)
         if not manifest:
-            sys.exit("Container %s was not found. Was it pulled?" % container_path)
+            sys.exit(
+                "Container %s was not found. Was it pulled?" % module.container_path
+            )
 
-        labels = manifest[0].get("Labels", {})
+        labels = manifest[0].get("Labels") or {}
+        labels = self.clean_labels(labels)
 
-        # If there's a tag in the name, don't use it
-        name = name.split(":", 1)[0]
+        # Option to create wrapper scripts for commands
+        aliases = module.config.get_aliases()
+        wrapper_scripts = []
+
+        # Wrapper scripts can be global (for aliases) or container specific
+        if self.settings.wrapper_scripts["enabled"] is True:
+            wrapper_scripts = shpc.main.wrappers.generate(
+                aliases=aliases,
+                wrapper_dir=module.wrapper_dir,
+                features=features,
+                container=self,
+                image=module.container_path,
+                config=module.config,
+            )
 
         # Make sure to render all values!
         out = template.render(
-            podman_module=self.settings.podman_module,
-            bindpaths=self.settings.bindpaths,
-            shell=self.settings.podman_shell
-            if self.command == "podman"
-            else self.settings.docker_shell,
-            image=container_path,
-            description=description,
-            module_dir=os.path.dirname(module_path),
+            settings=self.settings,
+            shell=self.shell_path,
             aliases=aliases,
-            url=url,
             features=features,
-            version=version,
             labels=labels,
-            prefix=self.settings.module_exc_prefix,
             creation_date=datetime.now(),
-            name=name,
-            tool=parsed_name.tool,
-            registry=parsed_name.registry,
-            repository=parsed_name.repository,
-            envfile=self.settings.environment_file,
             command=self.command,
-            tty=self.settings.enable_tty,
+            module=module,
+            parsed_name=module.config.name,
+            wrapper_scripts=wrapper_scripts,
         )
         shpc.utils.write_file(module_path, out)

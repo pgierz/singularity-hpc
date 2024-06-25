@@ -1,17 +1,20 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
-from shpc.logger import logger
-import shpc.utils
-from .base import ContainerTechnology, ContainerName
-
+import os
+import re
+import shutil
 from datetime import datetime
 from glob import glob
-import re
-import os
-import shutil
+
+import shpc.main.container.update as update
+import shpc.main.wrappers
+import shpc.utils as utils
+from shpc.logger import logger
+
+from .base import ContainerTechnology
 
 
 class SingularityContainer(ContainerTechnology):
@@ -23,6 +26,7 @@ class SingularityContainer(ContainerTechnology):
 
     # The module technology adds extensions here
     templatefile = "singularity"
+    command = "singularity"
 
     # Singularity container features
     features = {
@@ -36,13 +40,13 @@ class SingularityContainer(ContainerTechnology):
             from spython.main import Client
 
             self.client = Client
-        except:
+        except Exception:
             logger.exit("singularity python (spython) is required to use singularity.")
         super(SingularityContainer, self).__init__()
 
     def exists(self, module_name):
         """
-        A derivate of get to return boolean about container existence.
+        A derivative of get to return boolean about container existence.
         """
         # This can be the module or container directory
         container_dir = self.container_dir(module_name)
@@ -71,66 +75,97 @@ class SingularityContainer(ContainerTechnology):
             logger.exit("Found more than one sif in module folder.")
         return sif[0]
 
-    def add(self, sif, module_name, modulefile, template, **kwargs):
+    def add(self, module_name, image, config, container_yaml, **kwargs):
         """
-        Manually add a registry container.
+        Manually add a registry container, e.g., generating a container.yaml
+        for an existing container file. container_yaml is the destination file.
+        If it's already existing, it's loaded into config. Otherwise we are
+        using a template config.
         """
-        module_dir = os.path.dirname(modulefile)
+        if ":" not in module_name:
+            tag = "latest"
+        else:
+            module_name, tag = module_name.split(":", 1)
 
-        # Ensure the container exists
-        sif = os.path.abspath(sif)
-        if not os.path.exists(sif):
-            logger.exit("%s does not exist." % sif)
+        # Cut out early if the tag isn't latest, and we already have it
+        # DO NOT call config.tags here, it will add an empty latest
+        if tag != "latest" and config._config and tag in config._config["tags"]:
+            if not utils.confirm_action(
+                "Tag %s already is defined, are you sure you want to overwrite it? "
+                % tag
+            ):
+                return
 
-        # First ensure that we aren't using a known namespace
-        for registry_dir, _ in self.iter_registry():
-            for subfolder in module_name.split("/"):
-                registry_dir = os.path.join(registry_dir, subfolder)
-                if os.path.exists(registry_dir):
-                    logger.exit(
-                        "%s is a known registry namespace, choose another for a custom addition."
-                        % subfolder
-                    )
+        # Destination for container in registry
+        dest_dir = os.path.dirname(container_yaml)
+        utils.mkdir_p(dest_dir)
 
-        # The user can have a different container directory defined
-        container_dir = self.container_dir(module_name)
-        shpc.utils.mkdirp([container_dir, module_dir])
+        # Add a docker (or local image) and return the config
+        if image.startswith("docker://"):
+            config = self._add_docker_image(
+                module_name, tag, image, config, container_yaml, **kwargs
+            )
+        else:
+            config = self._add_local_image(
+                module_name, tag, image, config, container_yaml, **kwargs
+            )
 
-        # Name the container appropriately
-        name = module_name.replace("/", "-")
-        digest = shpc.utils.get_file_hash(sif)
-        dest = os.path.join(container_dir, "%s-sha256:%s.sif" % (name, digest))
-        shutil.copyfile(sif, dest)
-
-        # Parse the module name for the user
-        parsed_name = ContainerName(module_name)
-
-        self.install(
-            modulefile,
-            dest,
-            module_name,
-            template,
-            parsed_name=parsed_name,
-            features=kwargs.get("features"),
+        # Final save of config, and tell the user we're done!
+        config.save(container_yaml)
+        logger.info(
+            "Registry entry %s was added! Before shpc install, edit:" % module_name
         )
-        self.add_environment(module_dir, {}, self.settings.environment_file)
-        logger.info("Module %s was created." % (module_name))
+        print(container_yaml)
+        return container_yaml
 
-    def install(
-        self,
-        module_path,
-        container_path,
-        name,
-        template,
-        parsed_name,
-        aliases=None,
-        template_name=None,
-        url=None,
-        description=None,
-        config_features=None,
-        features=None,
-        version=None,
-    ):
+    def _add_local_image(self, name, tag, image, config, container_yaml, **kwargs):
+        """
+        A subtype of "add" that adds a local image, e.g.,:
+
+        shpc add <container.sif> <uri>
+        """
+        if not os.path.exists(image):
+            logger.exit(f"{image} does not exist.")
+
+        digest = utils.get_file_hash(image)
+
+        # Destination for container in registry
+        dest_dir = os.path.dirname(container_yaml)
+
+        # The destination container in the registry folder
+        container_digest = "sha256:%s" % digest
+        container_name = "%s.sif" % container_digest
+        dest_container = os.path.join(dest_dir, container_name)
+
+        # Update the config path and latest
+        config.set("path", container_name)
+        config.set("latest", {tag: container_digest})
+        config.add_tag(tag, container_digest)
+
+        # Only copy if it's not there yet (enforces naming by hash)
+        if not os.path.exists(dest_container):
+            shutil.copyfile(image, dest_container)
+        return config
+
+    def _add_docker_image(self, name, tag, image, config, container_yaml, **kwargs):
+        """
+        A subtype of "add" that adds a docker URI, e.g.,:
+
+        shpc add docker://vanessa/salad
+        shpc add docker://vanessa/salad dinosaur/salad
+        TODO need to test if different URI will work
+        """
+        # Container name should not have tag
+        container_name = image.replace("docker://", "").split(":", 1)[0]
+        tags = update.get_container_tag(container_name, tag)
+
+        # Update the config path and latest
+        config.set("docker", container_name)
+        config.set("latest", tags)
+        config.add_tag(tag, tags[tag])
+        return config
+
+    def install(self, module_path, template, module, features=None):
         """Install a general container path to a module
 
         The module_dir should be created by the calling function, and
@@ -141,59 +176,67 @@ class SingularityContainer(ContainerTechnology):
         # Container features are defined in container.yaml and the settings
         # and specific values are determined by the container technology
         features = self.get_features(
-            config_features, self.settings.container_features, features
+            module.config.features, self.settings.container_features, features
         )
 
         # Remove any previous containers
-        container_dir = os.path.dirname(container_path)
+        container_dir = os.path.dirname(module.container_path)
         for older in glob("%s%s*.sif" % (container_dir, os.sep)):
-            if older == container_path:
+            if older == module.container_path:
                 continue
             os.remove(older)
 
         # Get inspect metadata from the container (only if singularity installed
         try:
-            metadata = self.inspect(container_path)
+            metadata = self.inspect(module.container_path)
 
             # Add labels, and deffile
-            labels = metadata.get("attributes", {}).get("labels")
+            labels = metadata.get("attributes", {}).get("labels") or {}
             deffile = (
                 metadata.get("attributes", {}).get("deffile", "").replace("\n", "\\n")
             )
-        except:
+        except Exception:
             metadata = None
             deffile = None
             labels = {}
-            logger.warning("Singularity is not installed, skipping metadata.")
+
+        # Option to create wrapper scripts for commands
+        aliases = module.config.get_aliases()
+
+        # Labels with newlines need to be handled, replace with comma
+        labels = self.clean_labels(labels)
+
+        # Wrapper scripts can be global (for aliases) or container specific
+        wrapper_scripts = []
+        if self.settings.wrapper_scripts["enabled"] is True:
+            wrapper_scripts = shpc.main.wrappers.generate(
+                aliases=aliases,
+                features=features,
+                container=self,
+                wrapper_dir=module.wrapper_dir,
+                image=module.container_path,
+                config=module.config,
+            )
 
         # Make sure to render all values!
         out = template.render(
-            singularity_module=self.settings.singularity_module,
-            singularity_shell=self.settings.singularity_shell,
-            bindpaths=self.settings.bindpaths,
-            container_sif=container_path,
-            description=description,
+            settings=self.settings,
             aliases=aliases,
-            url=url,
             features=features,
-            version=version,
-            module_dir=os.path.dirname(module_path),
             labels=labels,
             deffile=deffile,
             creation_date=datetime.now(),
-            name=name,
-            tool=parsed_name.tool,
-            registry=parsed_name.registry,
-            repository=parsed_name.repository,
-            envfile=self.settings.environment_file,
+            module=module,
+            parsed_name=module.config.name,
+            wrapper_scripts=wrapper_scripts,
         )
-        shpc.utils.write_file(module_path, out)
+        utils.write_file(module_path, out)
 
     def registry_pull(self, module_dir, container_dir, config, tag):
         """
         Given a module directory, container config, and tag, pull the container
         """
-        pull_type = "docker" if getattr(config, "docker") else "gh"
+        pull_type = config.get_pull_type()
 
         # Preserve name and version of container if it's ever moved
         container_path = os.path.join(
@@ -201,8 +244,12 @@ class SingularityContainer(ContainerTechnology):
         )
 
         # We pull by the digest
-        if pull_type == "docker":
-            container_uri = "docker://%s@%s" % (config.docker, tag.digest)
+        if pull_type in ["docker", "oras"]:
+            container_uri = "%s://%s@%s" % (
+                pull_type,
+                config.docker or config.oras,
+                tag.digest,
+            )
         elif pull_type == "gh":
             container_uri = "gh://%s/%s:%s" % (config.gh, tag.digest, tag.name)
 
@@ -283,7 +330,7 @@ class SingularityContainer(ContainerTechnology):
         """
         Pull a container to a destination
         """
-        if re.search("^(docker|shub|https)", uri):
+        if re.search("^(docker|shub|https|oras)", uri):
             return self._pull_regular(uri, dest)
         elif uri.startswith("gh://"):
             return self._pull_github(uri, dest)
@@ -294,7 +341,12 @@ class SingularityContainer(ContainerTechnology):
         """
         pull_folder = os.path.dirname(dest)
         name = os.path.basename(dest)
-        return self.client.pull(uri, name=name, pull_folder=pull_folder)
+        image, lines = self.client.pull(
+            uri, name=name, pull_folder=pull_folder, stream=True
+        )
+        for line in lines:
+            print(line, end="")
+        return image
 
     def inspect(self, image):
         """
@@ -313,7 +365,7 @@ class SingularityContainer(ContainerTechnology):
         repo = "/".join(uri.split("/")[0:2])
         prefix = repo.replace("/", "-")
 
-        # The tag includes release and contianer tag (e.g., 0.0.1:latest)
+        # The tag includes release and container tag (e.g., 0.0.1:latest)
         tag = uri.replace(repo, "", 1).strip("/")
         github_tag, container_tag = tag.split(":", 1)
 
@@ -335,8 +387,8 @@ class SingularityContainer(ContainerTechnology):
         """
         Given a test file, run it and respond accordingly.
         """
-        command = ["singularity", "exec", image, "/bin/bash", test_script]
-        result = shpc.utils.run_command(command)
+        command = [self.command, "exec", image, "/bin/bash", test_script]
+        result = utils.run_command(command)
 
         # We can't run on incompatible hosts
         if (

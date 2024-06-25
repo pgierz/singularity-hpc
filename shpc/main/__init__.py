@@ -1,13 +1,13 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
-from .settings import Settings
-
+import shpc.defaults
 import shpc.utils
 from shpc.logger import logger
-import shpc.defaults
+
+from .settings import Settings
 
 
 def get_client(quiet=False, **kwargs):
@@ -20,8 +20,8 @@ def get_client(quiet=False, **kwargs):
     quiet: if True, suppress most output about the client (e.g. speak)
 
     """
-    # The name of the module
-    module = kwargs.get("module")
+    # The name of the module system
+    module_sys = kwargs.get("module_sys")
     validate = kwargs.get("validate", True)
 
     # Load user settings to add to client, and container technology
@@ -29,29 +29,29 @@ def get_client(quiet=False, **kwargs):
     container = kwargs.get("container_tech") or settings.container_tech
 
     # Use the user provided module OR the default
-    module = module or settings.get("module_sys", "lmod")
+    module_sys = module_sys or settings.get("module_sys", "lmod")
 
     # Determine the client based on the module name (defaults to base client)
-    if module == "lmod":
+    if module_sys == "lmod":
         from shpc.main.modules.lmod import Client
-    elif module == "tcl":
+    elif module_sys == "tcl":
         from shpc.main.modules.tcl import Client
     else:
         from .client import Client
 
     # Add the container operator
     if container == "singularity":
-        from .container import SingularityContainer
+        from shpc.main.container import SingularityContainer
 
         Client.container = SingularityContainer()
 
     elif container == "podman":
-        from .container import PodmanContainer
+        from shpc.main.container import PodmanContainer
 
         Client.container = PodmanContainer()
 
     elif container == "docker":
-        from .container import DockerContainer
+        from shpc.main.container import DockerContainer
 
         Client.container = DockerContainer()
 
@@ -64,6 +64,8 @@ def get_client(quiet=False, **kwargs):
         logger.warning(
             "%s is not installed, functionality might be limited." % container.upper()
         )
+
+    # Pass on settings and container to module too
     Client.quiet = quiet
     Client.settings = settings
     return Client()

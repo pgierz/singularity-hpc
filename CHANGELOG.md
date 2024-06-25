@@ -13,7 +13,52 @@ and **Merged pull requests**. Critical items to know are:
 
 The versions coincide with releases on pip. Only major versions will be released as tags on Github.
 
-## [0.0.x](https://github.scom/singularityhub/singularity-hpc/tree/master) (0.0.x)
+## [0.0.x](https://github.com/singularityhub/singularity-hpc/tree/main) (0.0.x)
+ - use quay.io api to list tags since does not conform to oci (0.1.28)
+ - filter out vex and sbom tags (0.1.27)
+ - unpin yaml dependency (0.1.26)
+ - Change format of config command output to only show setting values, not keys, for parseability (0.1.25)
+ - Allow custom location for wrapper scripts (0.1.24)
+ - Labels with newlines need additional parsing (0.1.23)
+ - Do not write directly to output with shpc show (0.1.22)
+ - Podman template bug (0.1.21)
+ - Improvement to shpc help command output (0.1.2)
+ - Support for remote registries on self-hosted Gitlab instances (0.1.19)
+ - Support for uninstall and fixing bug in biocontainers install (0.1.18)
+ - GitHub action to update a registry from a cache or listing (0.1.17)
+   - Support for "remove" command to more easily remove / uninstall entries
+ - Fix bugs uninstalling all tags of a module (0.1.16)
+ - support for install using registry recipe and local image (0.1.15)
+ - fix views .view_module modulefile and loading (0.1.14)
+ - support for system modules, depends on, in views and editor envars (0.1.13)
+ - Wrappers now supported for shell/exec/run container commands (0.1.12)
+ - Update add to return container yaml (0.1.11)
+ - Fixing bug with writing package file in update (0.1.1)
+ - Add support for remote registry and sync commands --all (0.1.0)
+  - support for GitLab and GitHub remotes
+ - fixing bug to config set/get nested fields, default for wrapper scripts true (0.0.57)
+  - change in behavior, instead of `key:value` for set/add `key value` now also works.
+ - adding support for container.yaml overrides (0.0.56)
+ - `SINGULARITY_CONTAINER` and `PODMAN_CONTAINER` support (0.0.55)
+ - support for views create, delete, edit, install, uninstall (0.0.54)
+  - also including cleanup of module in views on uninstall
+  - ability to set custom config variable on the fly with -c
+ - add support for shpc update so container can be updated without binoc (0.0.53)
+ - better error message if container tag does not exist on update (0.0.52)
+ - minimum version of spython required is 0.2.0 to support apptainer (0.0.51)
+ - add support for TCL and LMOD default version, multiple variants (0.0.50)
+ - refactor to "add" to generate a container.yaml first (0.0.49)
+ - Properly cleanup empty module directories, and asking to remove a container that doesn't exist now logs a _warning_ (0.0.48)
+ - wrapper script generation permissions error (0.0.47)
+ - fixing but with stream command repeating output (0.0.46)
+ - Adding support for wrapper scripts for global and container.yaml (0.0.45)
+ - Lua and tcl module file bug fixes for shell functions and aliases (0.0.44)
+  - restoring -B for Singularity bindpaths over using envar
+ - default containers directory should be separate from modules (0.0.43)
+ - remove redundancy of manual bindpaths and SINGULARITY_BINDPATH (0.0.42)
+ - Do not unset container environment vars if they are already set (0.0.41)
+ - Central config should be read first (and updated with user config) (0.0.4)
+ - Add support for oras pull for singularity (0.0.39)
  - Bug with setting a nested value (0.0.38)
  - Adding quotes around tcl descriptions (0.0.37)
  - fixing bug with container install (does not honor module directory) (0.0.36)
@@ -74,4 +119,3 @@ The versions coincide with releases on pip. Only major versions will be released
  - Bugfix and better documentation for show/pull/list (0.0.13)
  - Adding support for pull from a GitHub release! (0.0.11)
  - Initial creation of project (0.0.1)
-

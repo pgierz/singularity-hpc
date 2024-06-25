@@ -1,20 +1,26 @@
 __author__ = "Vanessa Sochat"
-__copyright__ = "Copyright 2021-2022, Vanessa Sochat"
+__copyright__ = "Copyright 2021-2024, Vanessa Sochat"
 __license__ = "MPL 2.0"
 
 
 import json
 
+import shpc.utils
+
 
 def main(args, parser, extra, subparser):
-
     from shpc.main import get_client
+
+    shpc.utils.ensure_no_extra(extra)
 
     cli = get_client(
         quiet=args.quiet,
         settings_file=args.settings_file,
         container_tech=args.container_tech,
     )
+
+    # Update config settings on the fly
+    cli.settings.update_params(args.config_params)
     metadata = cli.inspect(args.module_name)
 
     # Case 1: dump entire thing as json
@@ -28,7 +34,6 @@ def main(args, parser, extra, subparser):
 
     # Case 3: pretty print the whole thing
     else:
-
         # Inspect Singularity formatted metadata
         if "attributes" in metadata:
             for key, value in metadata.get("attributes", {}).items():
